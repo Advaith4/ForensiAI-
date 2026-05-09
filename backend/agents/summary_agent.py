@@ -74,7 +74,7 @@ def generate_investigation_summary(case_data: Dict[str, Any]) -> Dict[str, Any]:
         cleaned = clean_ai_response(str(result.raw))
         data = json.loads(cleaned)
         
-        log_info(f"✓ Investigation summary generated")
+        log_info(f"[OK] Investigation summary generated")
         
         return {
             "summary": data.get("summary", "Investigation ongoing"),
@@ -92,10 +92,21 @@ def _fallback_summary_generation(case_data: Dict[str, Any]) -> Dict[str, Any]:
     
     cause = case_data.get("cause_of_death", "undetermined")
     risk_level = case_data.get("risk_level", "UNKNOWN")
-    timeline_count = len(case_data.get("events", []))
+    injuries = case_data.get("injuries", [])
+    events = case_data.get("events", [])
+    anomalies = case_data.get("anomalies", [])
+    timeline_count = len(events)
     
-    summary = f"Investigation findings suggest {cause}. Risk level classified as {risk_level}. "
-    summary += f"Timeline includes {timeline_count} documented events with identified anomalies requiring further investigation."
+    injury_summary = ", ".join(injuries[:5]) if injuries else "no structured injury findings"
+    anomaly_summary = ", ".join(anomalies[:3]) if anomalies else "no cross-source anomalies beyond available evidence limits"
+
+    summary = (
+        f"The forensic review identifies {cause} as the primary medical finding. "
+        f"Key autopsy indicators include {injury_summary}. "
+        f"The case is classified as {risk_level} risk based on injury severity, case notes, and available evidence correlation. "
+        f"The reconstructed timeline currently contains {timeline_count} event(s); correlation review notes {anomaly_summary}. "
+        "These findings should be treated as investigative intelligence and validated against original evidence, scene documentation, and witness statements."
+    )
     
     recommendations = []
     
@@ -103,20 +114,29 @@ def _fallback_summary_generation(case_data: Dict[str, Any]) -> Dict[str, Any]:
         recommendations.extend([
             "Escalate to priority investigation team",
             "Request additional forensic analysis",
-            "Conduct extended witness interviews"
+            "Conduct extended witness interviews",
+            "Preserve and re-check all original evidence media",
+            "Correlate autopsy injury pattern with scene photographs and weapon characteristics"
         ])
     elif risk_level == "MEDIUM":
         recommendations.extend([
             "Continue standard investigation protocols",
             "Review timeline for inconsistencies",
-            "Request specialist pathology review"
+            "Request specialist pathology review",
+            "Collect missing CCTV, GPS, or metadata evidence where available"
         ])
     else:
-        recommendations.append("Proceed with standard investigation procedures")
+        recommendations.extend([
+            "Proceed with standard investigation procedures",
+            "Collect additional evidence if new inconsistencies emerge"
+        ])
     
-    recommendations.append("Document all findings for prosecution support")
+    recommendations.extend([
+        "Document all findings for prosecution support",
+        "Record limitations caused by missing evidence sources"
+    ])
     
-    log_info(f"✓ Summary fallback generated with {len(recommendations)} recommendations")
+    log_info(f"[OK] Summary fallback generated with {len(recommendations)} recommendations")
     
     return {
         "summary": summary,

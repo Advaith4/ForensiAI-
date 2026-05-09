@@ -60,7 +60,7 @@ async def upload_evidence(
     db.commit()
     db.refresh(evidence)
     
-    log_info(f"✓ Evidence uploaded: {file.filename} ({file_type}) for case {case_id}")
+    log_info(f"[OK] Evidence uploaded: {file.filename} ({file_type}) for case {case_id}")
     
     return {
         "message": "File uploaded successfully",

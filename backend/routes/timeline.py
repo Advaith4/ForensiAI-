@@ -41,7 +41,7 @@ async def get_timeline(case_id: str, db: Session = Depends(get_db)):
         for e in events
     ]
     
-    log_info(f"✓ Timeline fetched for {case_id}: {len(timeline_events)} events")
+    log_info(f"[OK] Timeline fetched for {case_id}: {len(timeline_events)} events")
     
     return TimelineResponse(
         case_id=case_id,

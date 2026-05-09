@@ -139,7 +139,7 @@ class TODCalculator:
         # Generate death window
         death_window = TODCalculator.generate_death_window(avg_hours)
         
-        log_info(f"✓ TOD calculated: {avg_hours} hours ± window, confidence: {avg_confidence}%")
+        log_info(f"[OK] TOD calculated: {avg_hours} hours ± window, confidence: {avg_confidence}%")
         
         return {
             "estimated_hours_since_death": round(avg_hours, 1),

@@ -12,7 +12,7 @@ def parse_metadata_file(file_path: str) -> Dict[str, Any]:
         with open(file_path, 'r') as f:
             data = json.load(f)
         
-        log_info(f"✓ Metadata parsed: {file_path}")
+        log_info(f"[OK] Metadata parsed: {file_path}")
         return data
     
     except Exception as e:
@@ -51,5 +51,5 @@ def extract_metadata_events(metadata: Dict[str, Any]) -> list:
                     "metadata": event
                 })
     
-    log_info(f"✓ Extracted {len(normalized)} metadata events")
+    log_info(f"[OK] Extracted {len(normalized)} metadata events")
     return normalized

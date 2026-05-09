@@ -17,7 +17,7 @@ from routes import cases, upload, analysis, results, timeline, reports
 async def lifespan(app: FastAPI):
     """Initialize and clean up application resources."""
     log_info("=" * 60)
-    log_info("▶ ForensiAI Backend Starting...")
+    log_info("ForensiAI Backend Starting...")
     log_info("=" * 60)
     
     # Initialize database
@@ -26,19 +26,19 @@ async def lifespan(app: FastAPI):
     # Create upload directory
     create_upload_directory()
     
-    log_info(f"✓ Environment: {settings.env}")
-    log_info(f"✓ Database: {settings.database_url}")
-    log_info(f"✓ Upload Dir: {settings.upload_dir}")
-    log_info(f"✓ Frontend: {settings.frontend_url}")
-    log_info(f"✓ Model: {settings.model_name}")
+    log_info(f"[OK] Environment: {settings.env}")
+    log_info(f"[OK] Database: {settings.database_url}")
+    log_info(f"[OK] Upload Dir: {settings.upload_dir}")
+    log_info(f"[OK] Frontend: {settings.frontend_url}")
+    log_info(f"[OK] Model: {settings.model_name}")
     log_info("=" * 60)
-    log_info("✓ Backend ready!")
-    log_info("✓ API Docs: http://localhost:8000/docs")
+    log_info("[OK] Backend ready!")
+    log_info("[OK] API Docs: http://localhost:8000/docs")
     log_info("=" * 60)
 
     yield
 
-    log_info("▶ ForensiAI Backend Shutting Down...")
+    log_info("ForensiAI Backend Shutting Down...")
 
 
 # Initialize FastAPI app

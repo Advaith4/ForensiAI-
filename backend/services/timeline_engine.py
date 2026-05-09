@@ -63,7 +63,7 @@ class TimelineEngine:
                 unique_events.append(event)
                 seen_signatures.add(sig)
         
-        log_info(f"✓ Removed {len(events) - len(unique_events)} duplicate events")
+        log_info(f"[OK] Removed {len(events) - len(unique_events)} duplicate events")
         return unique_events
     
     @staticmethod
@@ -163,6 +163,6 @@ class TimelineEngine:
         # Step 3: Merge related events
         merged_events = TimelineEngine.merge_events(sorted_events, time_window_minutes=15)
         
-        log_info(f"✓ Timeline reconstructed: {len(merged_events)} events")
+        log_info(f"[OK] Timeline reconstructed: {len(merged_events)} events")
         
         return merged_events

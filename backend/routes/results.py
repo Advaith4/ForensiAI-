@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Case, AIResult
 from schemas.result_schema import ReportResponse
+from services.report_document import render_report_html, render_report_markdown
 from services.report_generator import ReportGenerator
 from utils.logger import log_info
 
@@ -86,6 +88,39 @@ async def get_case_report(case_id: str, db: Session = Depends(get_db)):
     
     report = ReportGenerator.generate_report(case_id, db)
     
-    log_info(f"✓ Report generated for {case_id}")
+    log_info(f"[OK] Report generated for {case_id}")
     
+    return report
+
+
+@router.get("/{case_id}/report/document", response_class=HTMLResponse)
+async def get_case_report_document(case_id: str, db: Session = Depends(get_db)):
+    """Generate a printable documented HTML investigation report."""
+    report = _get_completed_report(case_id, db)
+    return HTMLResponse(render_report_html(report))
+
+
+@router.get("/{case_id}/report/markdown", response_class=PlainTextResponse)
+async def get_case_report_markdown(case_id: str, db: Session = Depends(get_db)):
+    """Generate a documented Markdown investigation report."""
+    report = _get_completed_report(case_id, db)
+    return PlainTextResponse(
+        render_report_markdown(report),
+        headers={"Content-Disposition": f'attachment; filename="{case_id}-forensiai-report.md"'}
+    )
+
+
+def _get_completed_report(case_id: str, db: Session):
+    case = db.query(Case).filter(Case.case_id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    if case.status != "completed":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Case analysis not completed. Current status: {case.status}"
+        )
+
+    report = ReportGenerator.generate_report(case_id, db)
+    log_info(f"[OK] Documented report generated for {case_id}")
     return report

@@ -55,6 +55,24 @@ class RiskEngine:
                 condition=lambda data: self._check_multiple_injuries(data)
             ),
             RiskRule(
+                name="excessive_sharp_force",
+                description="Numerous sharp-force injuries suggesting a sustained violent assault",
+                score=35,
+                condition=lambda data: self._check_excessive_sharp_force(data)
+            ),
+            RiskRule(
+                name="defensive_wounds",
+                description="Defensive wounds indicate victim resistance",
+                score=20,
+                condition=lambda data: self._check_defensive_wounds(data)
+            ),
+            RiskRule(
+                name="vital_organ_damage",
+                description="Sharp-force trauma damaged vital organs or caused fatal bleeding",
+                score=25,
+                condition=lambda data: self._check_vital_organ_damage(data)
+            ),
+            RiskRule(
                 name="toxic_substances",
                 description="Presence of toxic substances or drugs",
                 score=25,
@@ -129,9 +147,47 @@ class RiskEngine:
     def _check_toxic_substances(data: Dict[str, Any]) -> bool:
         """Check for toxic substances"""
         autopsy_data = data.get("autopsy", {})
-        toxins = autopsy_data.get("toxicology", [])
+        toxins = autopsy_data.get("toxicology", []) or autopsy_data.get("toxins", [])
         
         return len(toxins) > 0
+
+    @staticmethod
+    def _check_excessive_sharp_force(data: Dict[str, Any]) -> bool:
+        """Check for repeated stab or sharp-force injuries."""
+        text = RiskEngine._autopsy_text(data)
+        injuries = RiskEngine._injury_text(data)
+
+        return any(term in text or term in injuries for term in [
+            "60 stab wounds",
+            "sixty stab wounds",
+            "multiple stab wounds",
+            "numerous stab wounds",
+            "sharp force"
+        ])
+
+    @staticmethod
+    def _check_defensive_wounds(data: Dict[str, Any]) -> bool:
+        """Check for defensive injuries."""
+        text = RiskEngine._autopsy_text(data)
+        injuries = RiskEngine._injury_text(data)
+        return "defensive wound" in text or "defensive wound" in injuries
+
+    @staticmethod
+    def _check_vital_organ_damage(data: Dict[str, Any]) -> bool:
+        """Check for organ trauma or fatal bleeding."""
+        text = RiskEngine._autopsy_text(data)
+        injuries = RiskEngine._injury_text(data)
+        return any(term in text or term in injuries for term in [
+            "fatal haemorrhage",
+            "fatal hemorrhage",
+            "lung",
+            "liver",
+            "pancreas",
+            "stomach",
+            "intestine",
+            "organ trauma",
+            "blood with clots"
+        ])
     
     @staticmethod
     def _check_timeline_gaps(data: Dict[str, Any]) -> bool:
@@ -174,7 +230,8 @@ class RiskEngine:
         
         # Check autopsy for defensive injuries
         cause = autopsy_data.get("cause_of_death", "").lower()
-        if "trauma" in cause or "blunt force" in cause:
+        notes = data.get("case_notes", "").lower()
+        if any(term in cause or term in notes for term in ["trauma", "blunt force", "stab", "knife", "assault"]):
             return True
         
         return False
@@ -209,14 +266,14 @@ class RiskEngine:
                 })
         
         # Determine risk level
-        if total_score >= 100:
+        if total_score >= 70:
             risk_level = "HIGH"
-        elif total_score >= 50:
+        elif total_score >= 35:
             risk_level = "MEDIUM"
         else:
             risk_level = "LOW"
         
-        log_info(f"✓ Risk assessment complete: {risk_level} ({total_score} points, {len(triggered_flags)} flags)")
+        log_info(f"[OK] Risk assessment complete: {risk_level} ({total_score} points, {len(triggered_flags)} flags)")
         
         return {
             "risk_level": risk_level,
@@ -235,3 +292,20 @@ class RiskEngine:
             return "Standard investigation protocols. Recommend additional forensic analysis."
         else:
             return "Standard investigation. Monitor for new evidence."
+
+    @staticmethod
+    def _autopsy_text(data: Dict[str, Any]) -> str:
+        autopsy_data = data.get("autopsy", {})
+        fields = [
+            autopsy_data.get("cause_of_death", ""),
+            autopsy_data.get("manner_of_death", ""),
+            autopsy_data.get("notes", ""),
+            data.get("case_notes", "")
+        ]
+        return " ".join(str(field) for field in fields).lower()
+
+    @staticmethod
+    def _injury_text(data: Dict[str, Any]) -> str:
+        autopsy_data = data.get("autopsy", {})
+        injuries = autopsy_data.get("injuries", [])
+        return " ".join(str(injury) for injury in injuries).lower()

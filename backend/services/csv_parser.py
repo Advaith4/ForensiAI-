@@ -13,7 +13,7 @@ def parse_csv(file_path: str) -> List[Dict[str, Any]]:
         df = pd.read_csv(file_path)
         records = df.to_dict('records')
         
-        log_info(f"✓ CSV parsed: {file_path} ({len(records)} records)")
+        log_info(f"[OK] CSV parsed: {file_path} ({len(records)} records)")
         return records
     
     except Exception as e:
@@ -69,7 +69,7 @@ def normalize_metadata(records: List[Dict[str, Any]], source_type: str) -> List[
         
         normalized_events.append(event)
     
-    log_info(f"✓ Normalized {len(normalized_events)} {source_type} events")
+    log_info(f"[OK] Normalized {len(normalized_events)} {source_type} events")
     return normalized_events
 
 

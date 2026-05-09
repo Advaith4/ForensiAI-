@@ -68,7 +68,7 @@ def analyze_correlations(evidence_data: Dict[str, Any]) -> Dict[str, Any]:
         cleaned = clean_ai_response(str(result.raw))
         data = json.loads(cleaned)
         
-        log_info(f"✓ Correlation analysis complete: {len(data.get('anomalies', []))} anomalies")
+        log_info(f"[OK] Correlation analysis complete: {len(data.get('anomalies', []))} anomalies")
         
         return {
             "anomalies": data.get("anomalies", []),
@@ -110,7 +110,7 @@ def _fallback_correlation_analysis(evidence_data: Dict[str, Any]) -> Dict[str, A
     if any("blackout" in e.get("event", "").lower() for e in events):
         patterns.append("System blackout or signal loss detected")
     
-    log_info(f"✓ Correlation fallback: {len(anomalies)} anomalies, {len(patterns)} patterns")
+    log_info(f"[OK] Correlation fallback: {len(anomalies)} anomalies, {len(patterns)} patterns")
     
     return {
         "anomalies": anomalies,

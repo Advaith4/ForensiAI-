@@ -31,7 +31,7 @@ async def create_case(case_data: CaseCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(case)
     
-    log_info(f"✓ Case created: {case_id}")
+    log_info(f"[OK] Case created: {case_id}")
     
     return case
 
@@ -72,6 +72,6 @@ async def update_case_notes(case_id: str, notes: str, db: Session = Depends(get_
     db.commit()
     db.refresh(case)
     
-    log_info(f"✓ Case notes updated: {case_id}")
+    log_info(f"[OK] Case notes updated: {case_id}")
     
     return {"message": "Case updated", "case": case}

@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,6 +28,17 @@ class Settings(BaseSettings):
     env: str = "development"
     debug: bool = True
     frontend_url: str = "http://localhost:3000"
+
+    @field_validator("debug", "sql_echo", mode="before")
+    @classmethod
+    def parse_boolish(cls, value):
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"release", "production", "prod", "off", "false", "0", "no"}:
+                return False
+            if normalized in {"development", "dev", "on", "true", "1", "yes"}:
+                return True
+        return value
 
 
 settings = Settings()

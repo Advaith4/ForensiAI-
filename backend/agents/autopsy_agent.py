@@ -98,7 +98,7 @@ def analyze_autopsy_report(autopsy_text: str) -> Dict[str, Any]:
         cleaned = clean_ai_response(str(result.raw))
         data = json.loads(cleaned)
         
-        log_info(f"✓ Autopsy analysis complete: {data['cause_of_death']}")
+        log_info(f"[OK] Autopsy analysis complete: {data['cause_of_death']}")
         
         return {
             "cause_of_death": data.get("cause_of_death", ""),
@@ -119,7 +119,11 @@ def _fallback_autopsy_analysis(autopsy_text: str) -> Dict[str, Any]:
     
     # Extract cause
     cause = "Natural causes"
-    if "asphyxia" in text_lower:
+    if "fatal haemorrhage" in text_lower or "fatal hemorrhage" in text_lower:
+        cause = "Fatal haemorrhage due to multiple stab wounds"
+    elif "sixty stab wounds" in text_lower or "60 stab wounds" in text_lower:
+        cause = "Multiple stab wounds"
+    elif "asphyxia" in text_lower:
         cause = "Asphyxiation"
     elif "trauma" in text_lower or "blunt force" in text_lower:
         cause = "Traumatic injury"
@@ -134,6 +138,25 @@ def _fallback_autopsy_analysis(autopsy_text: str) -> Dict[str, Any]:
     
     # Extract injuries
     injuries = []
+    if "sixty stab wounds" in text_lower or "60 stab wounds" in text_lower:
+        injuries.append("60 stab wounds documented")
+    if "defensive wound" in text_lower:
+        injuries.append("Defensive wounds on palms/hands")
+    if "right lung" in text_lower:
+        injuries.append("Right lung stab wounds")
+    if "left lung" in text_lower:
+        injuries.append("Left lung stab wounds")
+    if "liver" in text_lower:
+        injuries.append("Liver stab wounds")
+    if "pancreas" in text_lower:
+        injuries.append("Pancreas injury")
+    if "intestine" in text_lower or "intestines" in text_lower:
+        injuries.append("Intestinal injury")
+    if "rib" in text_lower:
+        injuries.append("Rib fractures")
+    if "haemorrhage" in text_lower or "hemorrhage" in text_lower:
+        injuries.append("Fatal haemorrhage")
+
     injury_keywords = [
         "fracture", "laceration", "contusion", "abrasion",
         "wound", "injury", "trauma", "hemorrhage"
@@ -152,11 +175,22 @@ def _fallback_autopsy_analysis(autopsy_text: str) -> Dict[str, Any]:
         if keyword in text_lower:
             toxins.append(keyword.capitalize())
     
-    log_info(f"✓ Autopsy fallback analysis: {cause}")
+    log_info(f"[OK] Autopsy fallback analysis: {cause}")
     
     return {
         "cause_of_death": cause,
-        "injuries": injuries[:5],  # Limit to 5
+        "injuries": _dedupe(injuries)[:10],
         "toxins": toxins[:5],
         "confidence": 0.65
     }
+
+
+def _dedupe(items: list[str]) -> list[str]:
+    seen = set()
+    result = []
+    for item in items:
+        key = item.lower()
+        if key not in seen:
+            seen.add(key)
+            result.append(item)
+    return result

@@ -32,11 +32,17 @@ async def process_case_analysis(
         if not case:
             return
         
+        # Clear previous pipeline outputs so re-analysis replaces stale results.
+        db.query(AIResult).filter(AIResult.case_id == case_id).delete()
+        db.query(TimelineEvent).filter(TimelineEvent.case_id == case_id).delete()
+        db.query(RiskFlag).filter(RiskFlag.case_id == case_id).delete()
+        db.commit()
+
         # Update status
         case.status = "processing"
         db.commit()
         
-        log_info(f"▶ Starting analysis pipeline for {case_id}")
+        log_info(f"Starting analysis pipeline for {case_id}")
         
         # ========== PHASE 1: Parse Evidence ==========
         log_info(f"[1/8] Parsing evidence files...")
@@ -47,6 +53,7 @@ async def process_case_analysis(
         
         parsed_evidence = {
             "autopsy": {},
+            "autopsy_texts": [],
             "events": [],
             "metadata": {}
         }
@@ -59,7 +66,12 @@ async def process_case_analysis(
                 if evidence.file_type == "autopsy":
                     # Parse autopsy PDF
                     pdf_data = parse_pdf(evidence.file_path)
-                    parsed_evidence["autopsy"] = extract_autopsy_data(pdf_data["text"])
+                    extracted_autopsy = extract_autopsy_data(pdf_data["text"])
+                    parsed_evidence["autopsy_texts"].append(extracted_autopsy.get("raw_text", pdf_data["text"]))
+                    parsed_evidence["autopsy"] = _merge_autopsy_data(
+                        parsed_evidence["autopsy"],
+                        extracted_autopsy
+                    )
                     evidence.processed = True
                 
                 elif evidence.file_type in ["cctv", "gps", "metadata"]:
@@ -115,13 +127,18 @@ async def process_case_analysis(
             db.add(timeline_event)
         db.commit()
         
-        log_info(f"[4/8] ✓ Timeline: {len(timeline)} events")
+        log_info(f"[4/8] [OK] Timeline: {len(timeline)} events")
         
         # ========== PHASE 5: Autopsy Agent ==========
         log_info(f"[5/8] Autopsy analysis...")
         
-        autopsy_text = parsed_evidence["autopsy"].get("notes", "")
+        autopsy_text = "\n\n".join(parsed_evidence.get("autopsy_texts", [])) or (
+            parsed_evidence["autopsy"].get("raw_text")
+            or parsed_evidence["autopsy"].get("notes", "")
+        )
         autopsy_result = analyze_autopsy_report(autopsy_text or "Standard autopsy findings")
+        autopsy_result["notes"] = autopsy_text[:4000]
+        autopsy_result["manner_of_death"] = parsed_evidence["autopsy"].get("manner_of_death", "")
         
         ai_result = AIResult(
             case_id=case_id,
@@ -131,6 +148,29 @@ async def process_case_analysis(
         db.add(ai_result)
         
         parsed_evidence["autopsy"] = autopsy_result
+
+        if autopsy_result.get("cause_of_death") or autopsy_result.get("injuries"):
+            autopsy_event = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "source": "autopsy",
+                "event": _build_autopsy_timeline_event(autopsy_result),
+                "severity": "high",
+                "metadata": {
+                    "cause_of_death": autopsy_result.get("cause_of_death", ""),
+                    "injuries": autopsy_result.get("injuries", []),
+                    "confidence": autopsy_result.get("confidence", 0.0)
+                }
+            }
+            timeline.append(autopsy_event)
+            db.add(TimelineEvent(
+                case_id=case_id,
+                timestamp=autopsy_event["timestamp"],
+                source=autopsy_event["source"],
+                event=autopsy_event["event"],
+                severity=autopsy_event["severity"],
+                metadata_json=autopsy_event["metadata"]
+            ))
+            db.commit()
         
         # ========== PHASE 6: Correlation Agent ==========
         log_info(f"[6/8] Correlation analysis...")
@@ -160,6 +200,7 @@ async def process_case_analysis(
             "events": timeline,
             "autopsy": parsed_evidence["autopsy"],
             "anomalies": parsed_evidence.get("anomalies", []),
+            "case_notes": case.notes or "",
             "witnesses": {}
         }
         
@@ -181,7 +222,7 @@ async def process_case_analysis(
         
         db.commit()
         
-        log_info(f"[7/8] ✓ Risk: {risk_assessment['risk_level']} ({risk_assessment['risk_score']})")
+        log_info(f"[7/8] [OK] Risk: {risk_assessment['risk_level']} ({risk_assessment['risk_score']})")
         
         # ========== PHASE 8: Summary Agent ==========
         log_info(f"[8/8] Generating summary...")
@@ -208,7 +249,7 @@ async def process_case_analysis(
         case.updated_at = datetime.utcnow()
         db.commit()
         
-        log_info(f"✓ Analysis pipeline complete for {case_id}")
+        log_info(f"[OK] Analysis pipeline complete for {case_id}")
     
     except Exception as e:
         log_error(f"Analysis pipeline failed for {case_id}", e)
@@ -216,6 +257,38 @@ async def process_case_analysis(
         if case:
             case.status = "failed"
             db.commit()
+
+
+def _build_autopsy_timeline_event(autopsy_result: dict) -> str:
+    """Create a concise timeline event from autopsy findings."""
+    cause = autopsy_result.get("cause_of_death") or "Autopsy findings recorded"
+    injuries = autopsy_result.get("injuries", [])
+    if injuries:
+        return f"{cause}; key injuries: {', '.join(injuries[:4])}"
+    return cause
+
+
+def _merge_autopsy_data(existing: dict, new_data: dict) -> dict:
+    """Merge findings from multiple autopsy documents without losing earlier evidence."""
+    if not existing:
+        return new_data
+
+    merged = existing.copy()
+    for key in ["victim_name", "age", "gender", "cause_of_death", "manner_of_death"]:
+        if not merged.get(key) and new_data.get(key):
+            merged[key] = new_data[key]
+
+    for key in ["injuries", "toxicology"]:
+        combined = list(merged.get(key, [])) + list(new_data.get(key, []))
+        seen = set()
+        merged[key] = [
+            item for item in combined
+            if item and not (item.lower() in seen or seen.add(item.lower()))
+        ]
+
+    merged["notes"] = "\n\n".join(filter(None, [merged.get("notes", ""), new_data.get("notes", "")]))[:4000]
+    merged["raw_text"] = "\n\n".join(filter(None, [merged.get("raw_text", ""), new_data.get("raw_text", "")]))
+    return merged
 
 
 @router.post("/{case_id}/analyze")
@@ -263,7 +336,7 @@ async def analyze_case(
         db
     )
     
-    log_info(f"✓ Analysis pipeline started for {case_id}")
+    log_info(f"[OK] Analysis pipeline started for {case_id}")
     
     return {
         "status": "processing",
