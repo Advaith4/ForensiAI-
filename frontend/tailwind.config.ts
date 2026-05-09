@@ -2,48 +2,41 @@ import type { Config } from "tailwindcss";
 
 const config: Config = {
   darkMode: ["class"],
-  content: [
-    "./app/**/*.{ts,tsx}",
-    "./components/**/*.{ts,tsx}",
-    "./lib/**/*.{ts,tsx}"
-  ],
+  content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))"
+        background: "#0B1120",
+        foreground: "#E5F1FF",
+        card: "rgba(15, 23, 42, 0.66)",
+        border: "rgba(148, 163, 184, 0.18)",
+        cyan: {
+          glow: "#22D3EE"
         },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))"
+        electric: "#38BDF8",
+        violet: "#8B5CF6",
+        alert: "#FB3B64"
+      },
+      boxShadow: {
+        glow: "0 0 38px rgba(34, 211, 238, 0.18)",
+        alert: "0 0 36px rgba(251, 59, 100, 0.18)"
+      },
+      backgroundImage: {
+        "radial-grid": "radial-gradient(circle at top left, rgba(34, 211, 238, 0.2), transparent 32%), radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.22), transparent 28%), linear-gradient(135deg, #0B1120 0%, #111827 48%, #090E1B 100%)"
+      },
+      keyframes: {
+        scan: {
+          "0%": { transform: "translateY(-120%)" },
+          "100%": { transform: "translateY(120%)" }
         },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))"
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))"
-        },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))"
-        },
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))"
+        pulseGlow: {
+          "0%, 100%": { opacity: "0.45" },
+          "50%": { opacity: "1" }
         }
       },
-      borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)"
+      animation: {
+        scan: "scan 2.8s ease-in-out infinite",
+        pulseGlow: "pulseGlow 2.2s ease-in-out infinite"
       }
     }
   },
