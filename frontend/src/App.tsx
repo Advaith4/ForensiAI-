@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
+import InvestigationGraph from "@/components/InvestigationGraph";
 import {
   Activity,
   Bell,
@@ -54,7 +55,7 @@ import { Progress } from "@/components/ui/progress";
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard },
   { label: "Cases", icon: FileScan },
-  { label: "Timeline", icon: Map },
+  { label: "Narrative Graph", icon: Map },
   { label: "Evidence", icon: Database },
   { label: "AI Analysis", icon: BrainCircuit },
   { label: "Risk Engine", icon: ShieldAlert },
@@ -165,6 +166,8 @@ export default function App() {
                   <CasesPanel cases={cases} selected={selectedCase.case_id} onSelect={loadCase} />
                 </div>
               </>
+            ) : activeTab === "Narrative Graph" ? (
+              <InvestigationGraph caseId={selectedCase.case_id} />
             ) : (
               <div className="flex h-[60vh] flex-col items-center justify-center rounded-3xl border border-white/10 bg-slate-950/40 text-center">
                 <BrainCircuit className="h-16 w-16 text-cyan-500/50" />
