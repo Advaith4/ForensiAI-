@@ -41,6 +41,13 @@ export type ActionPlanItem = {
 
 export type InvestigativeIntelligence = {
   crime_story: string;
+  story_beats?: { 
+    title: string; 
+    description: string;
+    phase?: "normal" | "suspicious" | "critical";
+    timestamp_guess?: string;
+    connected_evidence?: string;
+  }[];
   case_breakthrough: string;
   investigative_hypotheses: InvestigativeHypothesis[];
   timeline_interpretation: string[];
@@ -50,6 +57,63 @@ export type InvestigativeIntelligence = {
   likely_scene_assessment: string;
   limitations: string[];
 };
+
+export type NodeCategory = "evidence" | "people" | "location" | "ai_flag" | "note" | "hypothesis" | "contradiction";
+
+export type NodeSource = "ai" | "user";
+
+export type InvestigationNodeData = {
+  label: string;
+  description?: string;
+  category: NodeCategory;
+  source: NodeSource;
+  storyBeatIds?: string[];
+  icon?: string;
+  color?: string;
+  event?: TimelineEvent;
+  flag?: RiskFlag;
+  hypothesis?: InvestigativeHypothesis;
+  beat?: { title: string; description: string; phase?: "normal" | "suspicious" | "critical"; timestamp_guess?: string; connected_evidence?: string };
+  story?: string;
+  personName?: string;
+  personRole?: string;
+  locationName?: string;
+  locationType?: string;
+  evidenceType?: string;
+  evidenceFile?: string;
+  noteContent?: string;
+  contradictionText?: string;
+  [key: string]: unknown;
+};
+
+export type NodePaletteItem = {
+  type: NodeCategory;
+  label: string;
+  icon: string;
+  color: string;
+  category: string;
+};
+
+export const NODE_PALETTE_ITEMS: NodePaletteItem[] = [
+  { type: "evidence", label: "Physical Evidence", icon: "FileSearch", color: "cyan", category: "Evidence" },
+  { type: "evidence", label: "Digital Evidence", icon: "Monitor", color: "cyan", category: "Evidence" },
+  { type: "evidence", label: "Document", icon: "FileText", color: "cyan", category: "Evidence" },
+  { type: "evidence", label: "Photograph", icon: "Camera", color: "cyan", category: "Evidence" },
+  { type: "evidence", label: "Forensic Report", icon: "Microscope", color: "cyan", category: "Evidence" },
+  { type: "people", label: "Suspect", icon: "UserX", color: "rose", category: "People" },
+  { type: "people", label: "Witness", icon: "Eye", color: "emerald", category: "People" },
+  { type: "people", label: "Victim", icon: "User", color: "orange", category: "People" },
+  { type: "location", label: "Crime Scene", icon: "Crosshair", color: "red", category: "Locations" },
+  { type: "location", label: "Secondary Scene", icon: "MapPin", color: "amber", category: "Locations" },
+  { type: "location", label: "Route", icon: "Navigation", color: "blue", category: "Locations" },
+  { type: "ai_flag", label: "Risk Flag", icon: "AlertTriangle", color: "red", category: "AI Flags" },
+  { type: "ai_flag", label: "Pattern Alert", icon: "Zap", color: "yellow", category: "AI Flags" },
+  { type: "ai_flag", label: "Anomaly", icon: "Activity", color: "orange", category: "AI Flags" },
+  { type: "note", label: "Investigator Note", icon: "StickyNote", color: "slate", category: "Notes" },
+  { type: "note", label: "Theory Note", icon: "Lightbulb", color: "purple", category: "Notes" },
+];
+
+export type EdgeRelationship = "implicates" | "contradicts" | "corroborates" | "located_at" | "witnessed" | "timeline" | "derived_from" | "related";
 
 export type CaseReport = {
   case_id: string;

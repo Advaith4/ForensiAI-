@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import InvestigationGraph from "@/components/InvestigationGraph";
+import { InvestigationGraph } from "@/components/InvestigationGraph";
 import {
   Activity,
   Bell,
@@ -19,7 +19,8 @@ import {
   Siren,
   Sparkles,
   UploadCloud,
-  UserCircle2
+  UserCircle2,
+  Trash2
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -42,7 +43,7 @@ import {
   XAxis,
   YAxis
 } from "recharts";
-import { analyzeCase, createCase, getCases, getReport, getReportDocumentUrl, uploadEvidence } from "@/lib/api";
+import { analyzeCase, createCase, getCases, getReport, getReportDocumentUrl, uploadEvidence, deleteCase } from "@/lib/api";
 import { activityData, confidenceData, mockCases, mockReport, mockTimeline, riskData } from "@/lib/mock-data";
 import type { CaseRecord, CaseReport } from "@/lib/types";
 import { cn, delay, formatDate } from "@/lib/utils";
@@ -54,7 +55,7 @@ import { Progress } from "@/components/ui/progress";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard },
-  { label: "Cases", icon: FileScan },
+  { label: "Case Details", icon: FileScan },
   { label: "Narrative Graph", icon: Map },
   { label: "Evidence", icon: Database },
   { label: "AI Analysis", icon: BrainCircuit },
@@ -103,20 +104,33 @@ export default function App() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => setIntro(false), 2400);
-    getCases()
-      .then((items) => {
-        if (items.length) setCases(items);
-        const first = items[0]?.case_id;
-        if (first) return getReport(first).then(setSelectedCase);
-        return undefined;
-      })
-      .catch(() => undefined);
+    refreshCases();
     return () => window.clearTimeout(timer);
   }, []);
 
-  const intelligence = selectedCase.structured_report?.investigative_intelligence || selectedCase.investigative_intelligence;
-  const timeline = selectedCase.structured_report?.timeline_analysis?.events || selectedCase.timeline || mockTimeline;
-  const riskScore = selectedCase.structured_report?.risk_assessment?.risk_score || selectedCase.risk_score || 0;
+  async function refreshCases() {
+    const items = await getCases();
+    if (items.length) setCases(items);
+  }
+
+  async function handleDeleteCase(id: string) {
+    if (!confirm("Are you sure you want to delete this case? This action cannot be undone.")) return;
+    try {
+      await deleteCase(id);
+      await refreshCases();
+      if (selectedCase?.case_id === id) {
+        setSelectedCase(mockReport);
+        setActiveTab("Dashboard");
+      }
+    } catch (e) {
+      console.error("Failed to delete case", e);
+      alert("Failed to delete case.");
+    }
+  }
+
+  const intelligence = selectedCase?.structured_report?.investigative_intelligence || selectedCase?.investigative_intelligence;
+  const timeline = selectedCase?.structured_report?.timeline_analysis?.events || selectedCase?.timeline || mockTimeline;
+  const riskScore = selectedCase?.structured_report?.risk_assessment?.risk_score || selectedCase?.risk_score || 0;
   const confidenceRows = useMemo(
     () =>
       confidenceData.map((row) => ({
@@ -155,17 +169,26 @@ export default function App() {
                 <MetricGrid cases={cases} />
                 <div className="mt-6 grid gap-6 2xl:grid-cols-[1.15fr_.85fr]">
                   <CommandAnalytics riskScore={riskScore} confidenceRows={confidenceRows} />
-                  <CaseIntelPanel report={selectedCase} intelligence={intelligence} onOpenReport={() => window.open(getReportDocumentUrl(selectedCase.case_id), "_blank")} />
-                </div>
-                <div className="mt-6 grid gap-6 xl:grid-cols-[.95fr_1.05fr]">
-                  <TimelinePanel timeline={timeline} />
-                  <CorrelationNetwork />
-                </div>
-                <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
                   <HeatmapPanel />
-                  <CasesPanel cases={cases} selected={selectedCase.case_id} onSelect={loadCase} />
+                </div>
+                <div className="mt-6">
+                  <CasesPanel 
+                    cases={cases} 
+                    selected={selectedCase?.case_id} 
+                    onSelect={(id) => { loadCase(id); setActiveTab("Case Details"); }} 
+                    onDelete={handleDeleteCase}
+                  />
                 </div>
               </>
+            ) : activeTab === "Case Details" ? (
+              <div className="space-y-6">
+                <HeroCommand selectedCase={selectedCase} onCreate={() => setFlowOpen(true)} />
+                <div className="grid gap-6 2xl:grid-cols-[1.15fr_.85fr]">
+                  <CaseIntelPanel report={selectedCase} intelligence={intelligence} onOpenReport={() => window.open(getReportDocumentUrl(selectedCase.case_id), "_blank")} />
+                  <CorrelationNetwork />
+                </div>
+                <TimelinePanel timeline={timeline} />
+              </div>
             ) : activeTab === "Narrative Graph" ? (
               <InvestigationGraph caseId={selectedCase.case_id} />
             ) : (
@@ -605,23 +628,31 @@ function HeatmapPanel() {
   );
 }
 
-function CasesPanel({ cases, selected, onSelect }: { cases: CaseRecord[]; selected: string; onSelect: (caseId: string) => void }) {
+function CasesPanel({ cases, selected, onSelect, onDelete }: { cases: CaseRecord[]; selected: string; onSelect: (caseId: string) => void; onDelete: (caseId: string) => void }) {
   return (
     <Card>
       <CardHeader><CardTitle>Active Case Queue</CardTitle></CardHeader>
       <CardContent className="space-y-3">
         {cases.slice(0, 6).map((item) => (
-          <button
-            key={item.case_id}
-            onClick={() => onSelect(item.case_id)}
-            className={cn("flex w-full items-center justify-between rounded-2xl border p-4 text-left transition", selected === item.case_id ? "border-cyan-300/35 bg-cyan-300/10" : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]")}
-          >
-            <div>
-              <p className="font-semibold text-white">{item.case_id}</p>
-              <p className="mt-1 text-sm text-slate-400">{item.victim_name} · {item.incident_location}</p>
-            </div>
-            <Badge tone={item.risk_level === "HIGH" ? "red" : item.risk_level === "MEDIUM" ? "yellow" : "green"}>{item.risk_level}</Badge>
-          </button>
+          <div key={item.case_id} className="flex gap-2">
+            <button
+              onClick={() => onSelect(item.case_id)}
+              className={cn("flex flex-1 items-center justify-between rounded-2xl border p-4 text-left transition", selected === item.case_id ? "border-cyan-300/35 bg-cyan-300/10" : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]")}
+            >
+              <div>
+                <p className="font-semibold text-white">{item.case_id}</p>
+                <p className="mt-1 text-sm text-slate-400">{item.victim_name} · {item.incident_location}</p>
+              </div>
+              <Badge tone={item.risk_level === "HIGH" ? "red" : item.risk_level === "MEDIUM" ? "yellow" : "green"}>{item.risk_level}</Badge>
+            </button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); onDelete(item.case_id); }}
+              className="flex items-center justify-center p-4 rounded-2xl border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition"
+              title="Delete Case"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+          </div>
         ))}
       </CardContent>
     </Card>

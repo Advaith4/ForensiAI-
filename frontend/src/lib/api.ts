@@ -25,6 +25,11 @@ export async function createCase(payload: CreateCasePayload) {
   return data;
 }
 
+export async function deleteCase(caseId: string) {
+  const { data } = await api.delete(`/cases/${caseId}`);
+  return data;
+}
+
 export async function uploadEvidence(caseId: string, fileType: string, file: File, onProgress?: (progress: number) => void) {
   const formData = new FormData();
   formData.append("file_type", fileType);

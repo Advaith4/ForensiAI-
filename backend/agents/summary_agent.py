@@ -28,8 +28,17 @@ def generate_investigation_summary(case_data: Dict[str, Any]) -> Dict[str, Any]:
             "mock_key_replace_with_yours"
         )
         
+        class StoryBeat(BaseModel):
+            title: str
+            description: str
+            phase: str
+            timestamp_guess: str
+            connected_evidence: str
+
         class InvestigationSummary(BaseModel):
             summary: str
+            crime_story: str
+            story_beats: list[StoryBeat]
             recommendations: list
             confidence: float
         
@@ -45,24 +54,37 @@ def generate_investigation_summary(case_data: Dict[str, Any]) -> Dict[str, Any]:
         
         case_summary = json.dumps({
             "cause_of_death": case_data.get("cause_of_death", ""),
-            "injuries": case_data.get("injuries", [])[:3],
-            "timeline_events": len(case_data.get("events", [])),
-            "anomalies": len(case_data.get("anomalies", [])),
+            "injuries": case_data.get("injuries", []),
+            "timeline_events": [e.get("event") for e in case_data.get("events", [])][:15],
+            "anomalies": case_data.get("anomalies", [])[:5],
             "risk_level": case_data.get("risk_level", "")
         }, indent=2)
         
         task = Task(
-            description=f"""Based on this investigation data, provide summary and recommendations.
+            description=f"""Based on this investigation data, provide an executive summary, a rich crime story narrative, and recommendations.
             
-            Investigation Summary:
+            Investigation Data:
             {case_summary}
             
             Return ONLY this JSON with NO markdown, NO code fences:
             {{
-                "summary": "Brief investigation summary (1-2 sentences)",
+                "summary": "Brief executive investigation summary (1-2 sentences)",
+                "crime_story": "A dramatic, realistic 2-paragraph narrative reconstructing the events of the crime like a true crime detective story based on the timeline and anomalies.",
+                "story_beats": [
+                    {{"title": "Victim entered industrial compound", "description": "...", "phase": "normal", "timestamp_guess": "...", "connected_evidence": "..."}},
+                    {{"title": "Suspicious vehicle observed near rear entrance", "description": "...", "phase": "suspicious", "timestamp_guess": "...", "connected_evidence": "..."}},
+                    {{"title": "Violent assault likely occurred", "description": "...", "phase": "critical", "timestamp_guess": "...", "connected_evidence": "..."}}
+                ],
                 "recommendations": ["recommendation1", "recommendation2"],
-                "confidence": 0.75
+                "confidence": 0.85
             }}
+            
+            RULES for story_beats:
+            1. You MUST output 4-8 comprehensive, deeply detailed story beats.
+            2. Each beat must have a phase: "normal", "suspicious", or "critical".
+            3. EXACTLY ONE beat MUST be "critical". This is the climax incident.
+            4. Do NOT use technical labels like "GPS Event". Use narrative language like "Victim movement abruptly stopped".
+            5. Ensure the description contains deep, insightful forensic reasoning rather than just simple statements.
             """,
             agent=agent,
             output_json=InvestigationSummary,
@@ -78,6 +100,8 @@ def generate_investigation_summary(case_data: Dict[str, Any]) -> Dict[str, Any]:
         
         return {
             "summary": data.get("summary", "Investigation ongoing"),
+            "crime_story": data.get("crime_story", ""),
+            "story_beats": data.get("story_beats", []),
             "recommendations": data.get("recommendations", []),
             "confidence": data.get("confidence", 0.5)
         }
@@ -140,6 +164,8 @@ def _fallback_summary_generation(case_data: Dict[str, Any]) -> Dict[str, Any]:
     
     return {
         "summary": summary,
+        "crime_story": summary,
+        "story_beats": [],
         "recommendations": recommendations,
         "confidence": 0.65
     }

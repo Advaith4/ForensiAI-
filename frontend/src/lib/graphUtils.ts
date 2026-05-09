@@ -1,158 +1,190 @@
-import dagre from "dagre";
-import type { Node, Edge } from "reactflow";
-import type { CaseReport, TimelineEvent, RiskFlag } from "@/lib/types";
+import dagre from 'dagre';
+import { Edge, Node } from 'reactflow';
+import type { TimelineEvent, RiskFlag, InvestigativeHypothesis, InvestigationNodeData } from '@/lib/types';
 
-/* ── source → colour mapping ─────────────────────────────────── */
-const SOURCE_COLORS: Record<string, string> = {
-  cctv: "#a855f7",
-  gps: "#22c55e",
-  mobile: "#f59e0b",
-  metadata: "#f59e0b",
-  ai: "#22d3ee",
-};
+function aiData(data: Partial<InvestigationNodeData>): InvestigationNodeData {
+  return {
+    label: data.label || 'AI Investigation Node',
+    category: data.category || 'ai_flag',
+    source: 'ai',
+    ...data,
+  } as InvestigationNodeData;
+}
 
-/* ── fallback demo data (used when API fails) ─────────────────── */
-export const FALLBACK_TIMELINE: TimelineEvent[] = [
-  { timestamp: "2026-05-08T19:45:00", source: "cctv", event: "Dark sedan detected entering south parking lot via Gate C", severity: "medium" },
-  { timestamp: "2026-05-08T20:02:00", source: "gps", event: "Victim device GPS shows steady northbound movement on service road", severity: "medium" },
-  { timestamp: "2026-05-08T20:14:00", source: "mobile", event: "Outgoing call to unknown prepaid number — 47 seconds", severity: "high" },
-  { timestamp: "2026-05-08T20:22:00", source: "cctv", event: "Victim last seen on camera near loading bay entrance", severity: "medium" },
-  { timestamp: "2026-05-08T20:31:00", source: "gps", event: "Sudden speed escalation to 94 km/h on restricted service lane", severity: "high" },
-  { timestamp: "2026-05-08T20:38:00", source: "mobile", event: "Device connects to unfamiliar WiFi SSID near industrial block", severity: "medium" },
-  { timestamp: "2026-05-08T20:46:00", source: "metadata", event: "Image EXIF places device at isolated parking lane — GPS mismatch", severity: "high" },
-  { timestamp: "2026-05-08T20:58:00", source: "ai", event: "AI: Anomaly detected — device location contradicts CCTV trajectory", severity: "high" },
-  { timestamp: "2026-05-08T21:03:00", source: "cctv", event: "Unidentified vehicle exits corridor via emergency gate", severity: "high" },
-  { timestamp: "2026-05-08T21:15:00", source: "ai", event: "AI: Suspicious correlation — vehicle exit coincides with signal loss", severity: "high" },
-];
-
-export const FALLBACK_FLAGS: RiskFlag[] = [
-  { name: "blood_footprint_mismatch", description: "Blood footprint pattern inconsistent with reported victim position at scene", score: 88 },
-  { name: "hidden_bloodstained_shirt", description: "Concealed bloodstained clothing found 200m from primary scene", score: 92 },
-  { name: "premeditation_tool_bag", description: "Bag containing zip ties, tape, and gloves found in vehicle trunk", score: 95 },
-];
-
-/* ── node dimensions for layout ───────────────────────────────── */
-const NODE_W = 280;
-const NODE_H = 100;
-
-/* ── build nodes + edges from a CaseReport ────────────────────── */
-export function buildGraph(report: CaseReport): { nodes: Node[]; edges: Edge[] } {
-  const rawTimeline = report.timeline ?? report.structured_report?.timeline_analysis?.events ?? FALLBACK_TIMELINE;
-  const rawFlags = report.flags ?? report.structured_report?.risk_assessment?.flags ?? FALLBACK_FLAGS;
-
-  const timeline = [...rawTimeline].sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+export function generateGraphLayout(
+  timeline: TimelineEvent[],
+  flags: RiskFlag[],
+  intelligence?: any
+): { nodes: Node[]; edges: Edge[] } {
+  const hypotheses: InvestigativeHypothesis[] = intelligence?.investigative_hypotheses || [];
+  const crimeStory: string = intelligence?.crime_story || "";
+  // 1. Sort timeline chronologically
+  const sortedTimeline = [...timeline].sort((a, b) => 
+    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
-
-  if (timeline.length === 0) return { nodes: [], edges: [] };
 
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
-  /* timeline nodes */
-  timeline.forEach((evt, i) => {
-    const id = `tl-${i}`;
-    const borderColor = SOURCE_COLORS[evt.source] ?? "#64748b";
-    const isHigh = evt.severity === "high";
+  const storyBeats = intelligence?.story_beats || [];
+  
+  // 1.5 Add Crime Story Node if available
+  if (crimeStory) {
+    nodes.push({
+      id: 'story-node',
+      type: 'customStory',
+      data: aiData({
+        label: 'Executive Crime Story',
+        category: 'hypothesis',
+        story: crimeStory,
+        description: crimeStory,
+      }),
+      position: { x: 0, y: 0 },
+    });
+  }
 
+  let lastSpineNodeId = crimeStory ? 'story-node' : null;
+
+  // 2. Generate Story Beats spine OR Timeline spine
+  if (storyBeats.length > 0) {
+    storyBeats.forEach((beat: any, index: number) => {
+      const id = `beat-${index}`;
+      nodes.push({
+        id,
+        type: 'customStoryBeat',
+        data: aiData({
+          label: beat.title || `Story Beat ${index + 1}`,
+          category: beat.phase === 'critical' ? 'ai_flag' : 'hypothesis',
+          beat,
+          description: beat.description,
+        }),
+        position: { x: 0, y: 0 },
+      });
+      
+      if (lastSpineNodeId) {
+        edges.push({
+          id: `e-${lastSpineNodeId}-${id}`,
+          source: lastSpineNodeId,
+          target: id,
+          animated: true,
+          style: { stroke: 'rgba(99,102,241,0.5)', strokeWidth: 2 },
+        });
+      }
+      lastSpineNodeId = id;
+    });
+  } else {
+    sortedTimeline.forEach((event, index) => {
+      const id = `timeline-${index}`;
+      nodes.push({
+        id,
+        type: 'customTimeline',
+        data: aiData({
+          label: event.event || `Timeline Event ${index + 1}`,
+          category: 'evidence',
+          event,
+          description: event.event,
+        }),
+        position: { x: 0, y: 0 },
+      });
+
+      if (lastSpineNodeId) {
+        edges.push({
+          id: `e-${lastSpineNodeId}-${id}`,
+          source: lastSpineNodeId,
+          target: id,
+          animated: true,
+          style: { stroke: 'rgba(34,211,238,0.5)', strokeWidth: 2 },
+        });
+      }
+      lastSpineNodeId = id;
+    });
+  }
+
+
+  // 4. Generate red anomaly nodes from report.flags[]
+  flags.forEach((flag, index) => {
+    const id = `risk-${index}`;
     nodes.push({
       id,
-      type: "forensicNode",
+      type: 'customRisk',
+      data: aiData({
+        label: flag.name || `Risk Flag ${index + 1}`,
+        category: 'ai_flag',
+        flag,
+        description: flag.description,
+      }),
       position: { x: 0, y: 0 },
-      data: {
-        kind: "timeline" as const,
-        event: evt.event,
-        timestamp: evt.timestamp,
-        source: evt.source,
-        severity: evt.severity,
-        borderColor,
-        isHigh,
-      },
     });
 
-    if (i > 0) {
-      const prevIsHigh = timeline[i - 1].severity === "high";
+    // Connect anomaly nodes to the last spine node
+    if (lastSpineNodeId) {
       edges.push({
-        id: `e-tl-${i - 1}-${i}`,
-        source: `tl-${i - 1}`,
+        id: `e-risk-${lastSpineNodeId}-${index}`,
+        source: lastSpineNodeId,
         target: id,
-        type: "smoothstep",
         animated: true,
-        style: {
-          stroke: prevIsHigh || isHigh ? "#f43f5e" : "#22d3ee",
-          strokeWidth: prevIsHigh || isHigh ? 2.5 : 1.5,
-          filter: "drop-shadow(0 0 4px rgba(34,211,238,.4))",
-        },
+        style: { stroke: 'rgba(239,68,68,0.5)', strokeWidth: 2 },
       });
     }
   });
 
-  /* risk / anomaly nodes */
-  const lastTlId = `tl-${timeline.length - 1}`;
-
-  rawFlags.forEach((flag, i) => {
-    const id = `risk-${i}`;
-    const isHigh = flag.score > 80;
-
+  // 6. Generate Hypothesis nodes (Crime Story Synthesis)
+  hypotheses.forEach((hypothesis, index) => {
+    const id = `hypothesis-${index}`;
     nodes.push({
       id,
-      type: "forensicNode",
+      type: 'customHypothesis',
+      data: aiData({
+        label: hypothesis.title || `Hypothesis ${index + 1}`,
+        category: 'hypothesis',
+        hypothesis,
+        description: hypothesis.reasoning,
+      }),
       position: { x: 0, y: 0 },
-      data: {
-        kind: "risk" as const,
-        name: flag.name,
-        description: flag.description,
-        score: flag.score,
-        borderColor: "#ef4444",
-        isHigh,
-      },
     });
 
-    edges.push({
-      id: `e-risk-${i}`,
-      source: lastTlId,
-      target: id,
-      type: "smoothstep",
-      animated: true,
-      style: {
-        stroke: isHigh ? "#f43f5e" : "#ef4444",
-        strokeWidth: isHigh ? 2.5 : 1.5,
-        strokeDasharray: "6 3",
-        filter: "drop-shadow(0 0 6px rgba(239,68,68,.5))",
-      },
-    });
+    // Connect hypotheses to the last spine node to show investigation conclusion
+    if (lastSpineNodeId) {
+      edges.push({
+        id: `e-hypothesis-${lastSpineNodeId}-${index}`,
+        source: lastSpineNodeId,
+        target: id,
+        animated: true,
+        style: { stroke: 'rgba(234,179,8,0.5)', strokeWidth: 2, strokeDasharray: '5,5' },
+      });
+    }
   });
 
-  return applyLayout(nodes, edges);
-}
-
-/* ── dagre layout with manual fallback ────────────────────────── */
-function applyLayout(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges: Edge[] } {
+  // 7. Use Dagre auto-layout
   try {
-    const g = new dagre.graphlib.Graph();
-    g.setDefaultEdgeLabel(() => ({}));
-    g.setGraph({ rankdir: "LR", nodesep: 60, ranksep: 120 });
+    const dagreGraph = new dagre.graphlib.Graph();
+    dagreGraph.setDefaultEdgeLabel(() => ({}));
+    dagreGraph.setGraph({ rankdir: 'LR', nodesep: 56, ranksep: 130, align: 'UL' });
 
-    nodes.forEach((n) => g.setNode(n.id, { width: NODE_W, height: NODE_H }));
-    edges.forEach((e) => g.setEdge(e.source, e.target));
-
-    dagre.layout(g);
-
-    const positioned = nodes.map((n) => {
-      const pos = g.node(n.id);
-      return { ...n, position: { x: pos.x - NODE_W / 2, y: pos.y - NODE_H / 2 } };
+    nodes.forEach((node) => {
+      let width = 320;
+      let height = 120;
+      if (node.type === 'customStory') { width = 450; height = 200; }
+      else if (node.type === 'customStoryBeat') { width = 360; height = 140; }
+      dagreGraph.setNode(node.id, { width, height });
     });
 
-    return { nodes: positioned, edges };
-  } catch {
-    /* manual fallback — simple horizontal chain */
-    const positioned = nodes.map((n, i) => ({
-      ...n,
-      position: {
-        x: i * 300,
-        y: n.data.kind === "risk" ? 220 : 60,
-      },
-    }));
-    return { nodes: positioned, edges };
+    edges.forEach((edge) => {
+      dagreGraph.setEdge(edge.source, edge.target);
+    });
+
+    dagre.layout(dagreGraph);
+
+    nodes.forEach((node) => {
+      const nodeWithPosition = dagreGraph.node(node.id);
+      node.position = {
+        x: nodeWithPosition.x - nodeWithPosition.width / 2,
+        y: nodeWithPosition.y - nodeWithPosition.height / 2,
+      };
+    });
+  } catch (err) {
+    console.error("Dagre layout failed, using fallback grid layout", err);
   }
+
+  return { nodes, edges };
 }

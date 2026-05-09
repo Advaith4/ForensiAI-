@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from pathlib import Path
 from database import get_db
-from models import Case
+from models import Case, Evidence, AIResult, TimelineEvent, RiskFlag
+from config import settings
 from schemas.case_schema import CaseCreate, CaseResponse, CaseDetailResponse
 from utils.helpers import generate_case_id
-from utils.logger import log_info
+from utils.logger import log_info, log_error
 from datetime import datetime
 
 router = APIRouter(prefix="/cases", tags=["cases"])
@@ -75,3 +77,42 @@ async def update_case_notes(case_id: str, notes: str, db: Session = Depends(get_
     log_info(f"[OK] Case notes updated: {case_id}")
     
     return {"message": "Case updated", "case": case}
+
+
+@router.delete("/{case_id}")
+async def delete_case(case_id: str, db: Session = Depends(get_db)):
+    """Delete a case and all associated data"""
+    
+    case = db.query(Case).filter(Case.case_id == case_id).first()
+    
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    evidence_files = db.query(Evidence).filter(Evidence.case_id == case_id).all()
+    upload_root = Path(settings.upload_dir).resolve()
+
+    for evidence in evidence_files:
+        try:
+            path = Path(evidence.file_path).resolve()
+            if upload_root in path.parents and path.exists():
+                path.unlink()
+        except Exception as e:
+            log_error(f"Unable to delete evidence file for {case_id}", e)
+
+    db.query(TimelineEvent).filter(TimelineEvent.case_id == case_id).delete(synchronize_session=False)
+    db.query(AIResult).filter(AIResult.case_id == case_id).delete(synchronize_session=False)
+    db.query(RiskFlag).filter(RiskFlag.case_id == case_id).delete(synchronize_session=False)
+    db.query(Evidence).filter(Evidence.case_id == case_id).delete(synchronize_session=False)
+    db.delete(case)
+    db.commit()
+
+    case_upload_dir = upload_root / case_id
+    try:
+        if case_upload_dir.exists() and not any(case_upload_dir.iterdir()):
+            case_upload_dir.rmdir()
+    except Exception as e:
+        log_error(f"Unable to remove empty upload directory for {case_id}", e)
+    
+    log_info(f"[OK] Case deleted: {case_id}")
+    
+    return {"message": f"Case {case_id} successfully deleted"}

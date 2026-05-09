@@ -99,7 +99,9 @@ class ReportGenerator:
             flags=flags,
             anomalies=anomalies,
             suspicious_patterns=suspicious_patterns,
-            limitations=_build_limitations(evidence_files, timeline, anomalies)
+            limitations=_build_limitations(evidence_files, timeline, anomalies),
+            crime_story_override=summary_data.get("crime_story"),
+            story_beats_override=summary_data.get("story_beats")
         )
 
         structured_report = {
@@ -219,7 +221,9 @@ def _build_investigative_intelligence(
     flags: List[Dict[str, Any]],
     anomalies: List[str],
     suspicious_patterns: List[str],
-    limitations: List[str]
+    limitations: List[str],
+    crime_story_override: str = None,
+    story_beats_override: List[Dict[str, str]] = None
 ) -> Dict[str, Any]:
     """Turn extracted facts into investigator-facing reasoning without inventing unsupported facts."""
     injuries = [str(item) for item in autopsy_data.get("injuries", []) if str(item).strip()]
@@ -245,7 +249,7 @@ def _build_investigative_intelligence(
             f"{first.get('timestamp', 'unknown time')}: {first.get('event', 'no event text')}."
         )
 
-    crime_story = _compose_crime_story(case, cause, manner, injuries, timeline, force_level, anomalies, limitations)
+    crime_story = crime_story_override if crime_story_override else _compose_crime_story(case, cause, manner, injuries, timeline, force_level, anomalies, limitations)
     breakthrough = _identify_case_breakthrough(force_level, injuries, timeline, flags, evidence_text)
 
     hypotheses = []
@@ -289,6 +293,7 @@ def _build_investigative_intelligence(
 
     return {
         "crime_story": crime_story,
+        "story_beats": story_beats_override or [],
         "case_breakthrough": breakthrough,
         "investigative_hypotheses": hypotheses,
         "timeline_interpretation": _interpret_timeline(timeline),
